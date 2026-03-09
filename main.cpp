@@ -3,8 +3,8 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <ostream>
-#include <sstream>
 #include <string>
+#include <string_view>
 #include <sys/event.h> // MAC ONLY: The epoll (linux) alternative (kqueue)
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -27,13 +27,29 @@ void set_non_blocking(int fd) {
 std::unordered_map<std::string, std::string> datastore;
 
 // Helper to split incoming text commands (e.g., "SET user:123 Hello")
-std::vector<std::string> split_command(const std::string &str) {
-  std::vector<std::string> tokens;
-  std::stringstream ss(str);
-  std::string token;
-  while (ss >> token) {
-    tokens.push_back(token);
+std::vector<std::string_view> split_command(std::string_view str) {
+  std::vector<std::string_view> tokens;
+
+  // network protocols usually end lines with \r\n so ignore those
+  constexpr std::string_view delimiters = "\r\n";
+
+  // step 1: find the first character that is not a space
+  size_t start = str.find_first_not_of(delimiters);
+
+  // std::string_view::npos is C++'s way of saying "I hit the end of the string"
+  while (start != std::string_view::npos) {
+    // step 2: From the 'start' position, find the next space
+    size_t end = str.find_first_of(delimiters, start);
+
+    // step 3: Extract teh word
+    // string_view::substr(start_index, length) does not copy memory
+    // It creates a new view pointing to that specific slice
+    tokens.push_back(str.substr(start, end - start));
+
+    // step 4: find the start of the next word, skipping any extra space
+    start = str.find_first_not_of(delimiters, end);
   }
+
   return tokens;
 }
 
@@ -182,23 +198,24 @@ int main() {
           close(current_fd);
         } else {
           // --- THE BRAIN OF THE DATABASE ---
-          std::string raw_command(buffer);
+          std::string_view raw_command(buffer);
           auto tokens = split_command(raw_command);
           std::string response = "-ERR Unknown Command\n";
 
           if (!tokens.empty()) {
-            std::string cmd = tokens[0];
+            std::string_view cmd = tokens[0];
             if (cmd == "SET" && tokens.size() >= 3) {
-              std::string key = tokens[1];
+              std::string key(tokens[1]);
               std::string value = "";
               for (size_t j = 2; j < tokens.size(); ++j) {
-                value += tokens[j] + (j == tokens.size() - 1 ? "" : " ");
+                value += std::string(tokens[j]) +
+                         (j == tokens.size() - 1 ? "" : " ");
               }
               datastore[key] = value;
               response = "+OK\n";
               std::cout << "[LOG] SET " << key << std::endl;
             } else if (cmd == "GET" && tokens.size() == 2) {
-              std::string key = tokens[1];
+              std::string key(tokens[1]);
               if (datastore.find(key) != datastore.end()) {
                 response = "$" + std::to_string(datastore[key].length()) +
                            "\n" + datastore[key] + "\n";
