@@ -31,7 +31,7 @@ std::vector<std::string_view> split_command(std::string_view str) {
   std::vector<std::string_view> tokens;
 
   // network protocols usually end lines with \r\n so ignore those
-  constexpr std::string_view delimiters = "\r\n";
+  constexpr std::string_view delimiters = " \r\n";
 
   // step 1: find the first character that is not a space
   size_t start = str.find_first_not_of(delimiters);
@@ -198,7 +198,7 @@ int main() {
           close(current_fd);
         } else {
           // --- THE BRAIN OF THE DATABASE ---
-          std::string_view raw_command(buffer);
+          std::string_view raw_command(buffer, bytes_read);
           auto tokens = split_command(raw_command);
           std::string response = "-ERR Unknown Command\n";
 
