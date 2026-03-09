@@ -124,10 +124,9 @@ int main() {
   while (true) {
 
     // --------------------------------------------------------------
-    // 2. REGISTER THE GREETER (server_fd)
-    // MAC: EV_SET configures the struct, kevent() registers it.
-    // LINUX: event.events = EPOLLIN; epoll_ctl(epoll_fd, EPOLL_CTL_ADD,
-    // server_fd, &event)
+    // 3. THE GRANDMASTER GOES TO SLEEP
+    // MAC: kevent() waiting for events
+    // LINUX: epoll_wait(epoll_fd, events, MAX_EVENTS, -1)
     // --------------------------------------------------------------
     int num_ready = kevent(kq, NULL, 0, event_list, MAX_EVENTS, NULL);
 
@@ -217,10 +216,4 @@ int main() {
 
   close(server_fd);
   return 0;
-}
-}
-}
-}
-
-return 0;
 }
